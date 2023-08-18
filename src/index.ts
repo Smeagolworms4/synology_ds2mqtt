@@ -124,6 +124,24 @@ console.log('Config:', `
     log:                  ${args.l.toUpperCase()}
 `);
 
+const TASK_STATUS_INT = {
+	1: 'waiting',
+	2: 'downloading',
+	3: 'paused',
+	4: 'finishing',
+	5: 'finished',
+	6: 'hash_checking',
+	7: 'pre_seeding',
+	8: 'seeding',
+	9: 'filehosting_waiting',
+	10: 'extracting',
+	11: 'preprocessing',
+	12: 'preprocesspass',
+	13: 'downloaded',
+	14: 'postprocessing',
+	15: 'captcha_needed',
+};
+
 
 const main = async () => {
 	try {
@@ -178,7 +196,7 @@ const main = async () => {
 				console.debug('DS login request');
 
 				const result = await requestDS({
-						path: 'auth',
+					path: 'auth',
 					query: {
 						api: 'SYNO.API.Auth',
 						method: 'Login',
@@ -418,32 +436,115 @@ const main = async () => {
 						api: 'SYNO.DownloadStation2.Task',
 						method: 'list',
 						version: 2,
-						additional: JSON.stringify(['detail','transfer']),
+						additional: JSON.stringify(['transfer']),
 					},
 				});
 
-				console.log(JSON.stringify(json, null, 2));
 
-				// for (const service of json.response.data) {
-				// 	publish('services', {
-				// 		[service.name.toLowerCase()]: {
-				// 			state: service.running ? 'ON' : 'OFF',
-				// 			attributes: JSON.stringify({
-				// 				enabled: service.enabled,
-				// 			})
-				// 		}
-				// 	});
-				// 	configHA(
-				// 		'binary_sensor',
-				// 		`services.${service.name.toLowerCase()}`,
-				// 		service.title,
-				// 		`services/${service.name.toLowerCase()}`,
-				// 		{
-				// 			device: deviceService,
-				// 			icon: 'mdi:cog'
-				// 		}
-				// 	);
-				// }
+				const total = {};
+				const completed = {};
+				const active = {};
+				const paused = {};
+
+				for (const d of json.data.task) {
+
+					const size = d.size;
+					const down_speed = d.additional.transfer.speed_download;
+					const up_speed = d.additional.transfer.speed_upload;
+					const down = d.additional.transfer.size_downloaded;
+					const up = d.additional.transfer.size_uploaded;
+					const percent_done = (down / size * 100).toFixed(2);
+
+					const info = {
+						id: d.id,
+						name: d.title,
+						status: TASK_STATUS_INT[d.status] || 'error',
+						status_id: d.status,
+						size: d.size,
+						type: d.type,
+						username: d.username,
+						percent_done,
+						down_speed,
+						up_speed,
+						down,
+						up,
+					};
+
+
+					total[d.id] = info;
+					if (down === size) completed[d.id] = info;
+					if ([ 1, 2, 4, 6, 7, 8, 9, 10, 11, 12, 14, 15 ].indexOf(d.status) !== -1) active[d.id] = info;
+					if ([ 3 ].indexOf(d.status) !== -1) paused[d.id] = info;
+
+
+					publish('task', {
+						total: {
+							state: Object.values(total).length,
+							attributes: JSON.stringify({
+								list: JSON.stringify(total)
+							})
+						},
+						completed: {
+							state: Object.values(completed).length,
+							attributes: JSON.stringify({
+								list: JSON.stringify(completed)
+							})
+						},
+						active: {
+							state: Object.values(active).length,
+							attributes: JSON.stringify({
+								list: JSON.stringify(active)
+							})
+						},
+						paused: {
+							state: Object.values(paused).length,
+							attributes: JSON.stringify({
+								list: JSON.stringify(paused)
+							})
+						},
+					});
+
+				}
+				configHA(
+					'sensor',
+					`task.total`,
+					'Task total',
+					`task/total`,
+					{
+						device: device,
+						icon: 'mdi:file-document-multiple'
+					}
+				);
+				configHA(
+					'sensor',
+					`task.completed`,
+					'Task completed',
+					`task/completed`,
+					{
+						device: device,
+						icon: 'mdi:file-document-multiple'
+					}
+				);
+				configHA(
+					'sensor',
+					`task.active`,
+					'Task active',
+					`task/active`,
+					{
+						device: device,
+						icon: 'mdi:file-document-multiple'
+					}
+				);
+				configHA(
+					'sensor',
+					`task.paused`,
+					'Task paused',
+					`task/paused`,
+					{
+						device: device,
+						icon: 'mdi:file-document-multiple'
+					}
+				);
 
 			} catch(e) {
 				console.error('ERROR:', e);
@@ -958,7 +1059,7 @@ const main = async () => {
 
 				await Promise.all([
 					updateStats(),
-					// updateList(),
+					updateList(),
 				]);
 
 			} catch(e) {
