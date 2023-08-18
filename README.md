@@ -14,9 +14,9 @@ Run container:
 ```bash
 docker run -ti \
     -e MQTT_URI=mqtt://login:password@192.168.1.100 \
-    -e OMV_URL=http://192.168.1.101 \
-    -e OMV_LOGIN=admin \
-    -e OMV_PASSWORD=password \
+    -e DS_URL=http://192.168.1.101 \
+    -e DS_LOGIN=admin \
+    -e DS_PASSWORD=password \
     smeagolworms4/synology_ds2mqtt
 ```
 
