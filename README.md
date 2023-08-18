@@ -1,6 +1,6 @@
 # Synology Download Station 2 MQTT
 
-Synology_DS2MQTT is a wrapper for send data on Open Media Vault to MQTT broker.
+Synology_DS2MQTT is a wrapper for send data on Synology Download Station to MQTT broker.
 
 ## Usage
 
